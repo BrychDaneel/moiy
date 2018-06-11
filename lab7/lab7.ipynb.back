@@ -1,0 +1,311 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 60,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import data\n",
+    "import sympy\n",
+    "from sympy import Symbol as S, diff\n",
+    "from numpy import matrix as M\n",
+    "import numpy\n",
+    "from sympy import And, Ge, Gt, Le, Lt, Rel, S"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 105,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from data import n\n",
+    "from data import m\n",
+    "from data import c\n",
+    "from data import c0\n",
+    "from data import b\n",
+    "from data import b0\n",
+    "from data import a\n",
+    "from data import xs\n",
+    "from data import xu\n",
+    "\n",
+    "from numpy import float64\n",
+    "from scipy.optimize import linprog\n",
+    "from pprint import pprint"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 106,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "EPS = 0.001"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 107,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x = M([S('x{}'.format(i)) for i in range(1, n+1)]).T"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 108,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "xs_dict = {x[i, 0]: xs[i, 0] for i in range(n)}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 109,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "f = c0 * x + 0.5 * x.T * b0.T * b0 * x\n",
+    "f = f[0,0]\n",
+    "g = []\n",
+    "for i in range(m):\n",
+    "    g.append((0.5 * x.T * b[i].T * b[i] * x + c[i] * x + a[i])[0,0])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 110,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "l = M([S('l{}'.format(i)) for i in range(1, n+1)]).T"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 111,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "lp_c = [diff(f, x[i, 0]).subs(xs_dict) for i in range(n)]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 112,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[0, 2, 4]\n"
+     ]
+    }
+   ],
+   "source": [
+    "active = [i for i in range(m) if abs(g[i].subs(xs_dict)) < EPS]\n",
+    "print(active)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 114,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1\n",
+      "0\n",
+      "0\n",
+      "1\n",
+      "1\n",
+      "1\n",
+      "0\n",
+      "0\n"
+     ]
+    }
+   ],
+   "source": [
+    "lp_a_ub = []\n",
+    "lp_b_ub = []\n",
+    "\n",
+    "for i in active:\n",
+    "    lp_a_ub.append([diff(g[i], x[ii, 0]).subs(xs_dict) for ii in range(n)])\n",
+    "    lp_b_ub.append(0)\n",
+    "    \n",
+    "for i in range(n):\n",
+    "    q = [0] * n\n",
+    "    q[i] = 1\n",
+    "    lp_a_ub.append(q)\n",
+    "    lp_b_ub.append(1)\n",
+    "    \n",
+    "    q = [0] * n\n",
+    "    q[i] = -1\n",
+    "    lp_a_ub.append(q)\n",
+    "    lp_b_ub.append(1 if abs(xs[i,0]) > EPS else 0)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 102,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "matrix([[  1.23109497e-13],\n",
+       "        [  1.55421966e-14],\n",
+       "        [  1.39858338e-14],\n",
+       "        [  3.53389603e-14],\n",
+       "        [  7.31324826e-14],\n",
+       "        [  6.40635157e-14],\n",
+       "        [  1.50779514e-13],\n",
+       "        [  6.61689476e-14]])"
+      ]
+     },
+     "execution_count": 102,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "res = linprog(lp_c, A_ub=lp_a_ub, b_ub=lp_b_ub, method='interior-point')\n",
+    "l0 = M(res.x).T\n",
+    "l0"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 48,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "8.6088489142931666e-12"
+      ]
+     },
+     "execution_count": 48,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "a = M([diff(f, x[i, 0]).subs(xs_dict) for i in range(n)], dtype=float) * l0\n",
+    "a = a[0,0]\n",
+    "a"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 49,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "-750.0"
+      ]
+     },
+     "execution_count": 49,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "b = M([diff(f, x[i, 0]).subs(xs_dict) for i in range(n)], dtype=float) * (xu - xs)\n",
+    "b = b[0,0]\n",
+    "b"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "1"
+      ]
+     },
+     "execution_count": 50,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "alpha = -a/2/b if b>0 else 1\n",
+    "alpha"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "matrix([[  5.00000000e-01],\n",
+       "        [  4.16298101e-15],\n",
+       "        [  9.48294514e-15],\n",
+       "        [  1.00000000e+00],\n",
+       "        [  2.00000000e+00],\n",
+       "        [  1.00000000e+00],\n",
+       "        [  4.95422731e-15],\n",
+       "        [  9.10206178e-15]])"
+      ]
+     },
+     "execution_count": 51,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "t = 1.0\n",
+    "new_x = xu[:]\n",
+    "while True:\n",
+    "    new_x = xs + t * l0 + alpha * t * (xu - xs)\n",
+    "    new_x_dict = {x[i, 0]: new_x[i, 0] for i in range(n)}\n",
+    "    norm = True\n",
+    "    for i in range(m):\n",
+    "        if f.subs(new_x_dict) <= 0:\n",
+    "            norm = False\n",
+    "\n",
+    "    norm = norm and (new_x[i]>=0).all()\n",
+    "    if norm and f.subs(new_x_dict) < f.subs(xs_dict):\n",
+    "        break\n",
+    "    t /= 2\n",
+    "new_x"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.5.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
